@@ -1,0 +1,166 @@
+# https://github.com/containers/podman-compose
+#
+# This is a generic podman-compose file for the Agora application. You may disable or enable services as needed by
+# commenting out the respective sections.
+services:
+  # ====================================================================================================================
+  # UTILS
+  # ====================================================================================================================
+
+  mailserver:
+    image: ghcr.io/axllent/mailpit:v1.27.3
+    ports:
+      - "3001:8025"
+      - "3002:1025"
+    networks:
+      - api
+    restart: unless-stopped
+    volumes:
+      - mailserver-data:/data
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_DATABASE: /data/mailpit.db
+      MP_SEND_API_AUTH_ACCEPT_ANY: true
+      MP_SMTP_AUTH_ACCEPT_ANY: true
+      MP_SMTP_AUTH_ALLOW_INSECURE: true
+      MP_SENDMAIL_FROM: noreply@agorastoryverse.com
+      MP_DISABLE_WAL: true
+      MP_VERBOSE: true
+
+  # ====================================================================================================================
+  # DATABASES
+  # ====================================================================================================================
+
+  json-keys-postgres:
+    image: ghcr.io/a-novel/service-json-keys/database:v1.3.0
+    networks:
+      - api
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: json-keys
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --auth=scram-sha-256
+    volumes:
+      - json-keys-postgres-data:/var/lib/postgresql/data/
+
+  authentication-postgres:
+    image: ghcr.io/a-novel/service-authentication/database:v1.2.6
+    networks:
+      - api
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: authentication
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --auth=scram-sha-256
+    volumes:
+      - authentication-postgres-data:/var/lib/postgresql/data/
+
+  story-schematics-postgres:
+    image: ghcr.io/a-novel/service-story-schematics/database:v1.2.0
+    networks:
+      - api
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: story-schematics
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --auth=scram-sha-256
+    volumes:
+      - story-schematics-postgres-data:/var/lib/postgresql/data/
+
+  # ====================================================================================================================
+  # SERVICES
+  # ====================================================================================================================
+
+  json-keys-service:
+    image: ghcr.io/a-novel/service-json-keys/standalone:v1.3.0
+    depends_on:
+      json-keys-postgres:
+        condition: service_started
+    ports:
+      - "4001:8080"
+    environment:
+      POSTGRES_DSN: postgres://postgres:postgres@json-keys-postgres:5432/json-keys?sslmode=disable
+      APP_MASTER_KEY: fec0681a2f57242211c559ca347721766f8a3acd8ed2e63b36b3768051c702ca
+    networks:
+      - api
+
+  authentication-service:
+    image: ghcr.io/a-novel/service-authentication/standalone:v1.2.6
+    depends_on:
+      authentication-postgres:
+        condition: service_started
+      json-keys-service:
+        condition: service_started
+      mailserver:
+        condition: service_started
+    ports:
+      - "4011:8080"
+    extra_hosts:
+      # Required to use SMTP without TLS. Go smtp library only allows unsecured connections over localhost, and
+      # the container network is not recognized as localhost.
+      - "localhost:host-gateway"
+    environment:
+      POSTGRES_DSN: postgres://postgres:postgres@authentication-postgres:5432/authentication?sslmode=disable
+      JSON_KEYS_SERVICE_URL: http://json-keys-service:8080/v1
+      AUTH_PLATFORM_URL: http://localhost:6001
+      SMTP_SENDER_DOMAIN: localhost
+      SMTP_ADDR: localhost:3002
+      SMTP_SENDER_NAME: Agora Storyverse [noreply]
+      SMTP_SENDER_EMAIL: noreply@agorastoryverse.com
+      SMTP_SENDER_PASSWORD: noreply
+    networks:
+      - api
+
+  story-schematics-service:
+    image: ghcr.io/a-novel/service-story-schematics/standalone:v1.2.0
+    depends_on:
+      story-schematics-postgres:
+        condition: service_started
+      json-keys-service:
+        condition: service_started
+    ports:
+      - "4021:8080"
+    environment:
+      POSTGRES_DSN: postgres://postgres:postgres@story-schematics-postgres:5432/story-schematics?sslmode=disable
+      JSON_KEYS_SERVICE_URL: http://json-keys-service:8080/v1
+      OPENAI_TOKEN: ${OPENAI_TOKEN}
+    networks:
+      - api
+
+  # ====================================================================================================================
+  # PLATFORMS
+  # ====================================================================================================================
+
+  authentication-platform:
+    image: ghcr.io/a-novel/platform-authentication/platform:master
+    depends_on:
+      authentication-service:
+        condition: service_started
+    ports:
+      - "6001:8080"
+    extra_hosts:
+      # SSR content runs in the container, but rendered client content is served by the host.
+      # To be able to use the same URl to access other services, we need to map the host gateway.
+      - "localhost:host-gateway"
+    environment:
+      VITE_TOLGEE_CDN: "https://cdn.tolg.ee/74c1bb8828074430ae95b462ab95374b"
+      VITE_SERVICE_AUTH_URL: http://localhost:4011/v1
+      VITE_PLATFORM_STUDIO_URL: http://localhost:6011
+    networks:
+      - api
+      - platform
+
+networks:
+  api:
+    driver: bridge
+  platform:
+    driver: bridge
+
+volumes:
+  json-keys-postgres-data:
+  authentication-postgres-data:
+  story-schematics-postgres-data:
+  mailserver-data:

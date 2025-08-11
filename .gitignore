@@ -1,0 +1,7 @@
+.idea
+
+.envrc
+
+*.log
+
+node_modules
