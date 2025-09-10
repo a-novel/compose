@@ -58,7 +58,7 @@ services:
       - authentication-postgres-data:/var/lib/postgresql/data/
 
   story-schematics-postgres:
-    image: ghcr.io/a-novel/service-story-schematics/database:v1.2.5
+    image: ghcr.io/a-novel/service-story-schematics/database:v1.2.6
     networks:
       - api
     environment:
@@ -115,7 +115,7 @@ services:
       - api
 
   story-schematics-service:
-    image: ghcr.io/a-novel/service-story-schematics/standalone:v1.2.5
+    image: ghcr.io/a-novel/service-story-schematics/standalone:v1.2.6
     depends_on:
       story-schematics-postgres:
         condition: service_started
