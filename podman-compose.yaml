@@ -32,7 +32,7 @@ services:
   # ====================================================================================================================
 
   json-keys-postgres:
-    image: ghcr.io/a-novel/service-json-keys/database:v2.0.1
+    image: ghcr.io/a-novel/service-json-keys/database:v2.0.2
     networks:
       - api
     environment:
