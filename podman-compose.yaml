@@ -75,7 +75,7 @@ services:
   # ====================================================================================================================
 
   json-keys-service:
-    image: ghcr.io/a-novel/service-json-keys/standalone:v1.3.22
+    image: ghcr.io/a-novel/service-json-keys/standalone:v2.0.2
     depends_on:
       json-keys-postgres:
         condition: service_started
