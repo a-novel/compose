@@ -32,7 +32,7 @@ services:
   # ====================================================================================================================
 
   json-keys-postgres:
-    image: ghcr.io/a-novel/service-json-keys/database:v2.1.2
+    image: ghcr.io/a-novel/service-json-keys/database:v2.1.3
     networks:
       - api
     environment:
@@ -75,7 +75,7 @@ services:
   # ====================================================================================================================
 
   json-keys-service:
-    image: ghcr.io/a-novel/service-json-keys/standalone:v2.1.2
+    image: ghcr.io/a-novel/service-json-keys/standalone:v2.1.3
     depends_on:
       json-keys-postgres:
         condition: service_started
